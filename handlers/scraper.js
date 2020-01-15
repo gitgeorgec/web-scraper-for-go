@@ -4,7 +4,7 @@ const JSZip = require("jszip");
 
 async function handleScraperStart(req, res, next) {
 	const browser = await puppeteer.launch({
-		headless: false,
+		headless: true,
 		defaultViewport: { width: 1440, height: 1080, },
 	}) ;
 	const page = await browser.newPage();
