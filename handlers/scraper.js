@@ -6,6 +6,7 @@ async function handleScraperStart(req, res, next) {
 	const browser = await puppeteer.launch({
 		headless: true,
 		defaultViewport: { width: 1440, height: 1080, },
+		args: ['--no-sandbox'],
 	}) ;
 	const page = await browser.newPage();
 	await page.goto("https://findbiz.nat.gov.tw/fts/query/QueryBar/queryInit.do", {
