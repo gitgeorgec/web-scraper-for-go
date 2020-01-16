@@ -5,7 +5,9 @@ const app = express();
 const scraperRoute = require('./routes/scraper');
 const PORT = process.env.PORT || 8081;
 
+
 app.use(cors())
+app.set("view engine", "pug")
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(bodyParser.text());
@@ -13,7 +15,7 @@ app.use(bodyParser.text());
 app.use("/api/scraper", scraperRoute)
 
 app.get('/', (req, res) => {
-	res.send(`<div><h1>TEST</h1><a href='/api/scraper'>click me</a></div>`)
+	res.render('index')
 })
 
 app.listen(PORT, () => {

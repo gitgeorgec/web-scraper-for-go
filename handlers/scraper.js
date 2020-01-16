@@ -3,6 +3,8 @@ const stream = require('stream');
 const JSZip = require("jszip");
 
 async function handleScraperStart(req, res, next) {
+	const { companyName } = req.body;
+
 	const browser = await puppeteer.launch({
 		headless: true,
 		defaultViewport: { width: 1440, height: 1080, },
@@ -13,10 +15,10 @@ async function handleScraperStart(req, res, next) {
 		waitUtil: 'networkidle2'
 	});
 
-	await page.evaluate(() => {
-		document.querySelector('#qryCond').value = '台灣積體電路'
-		document.querySelector('#qryBtn').click()
-	})
+	await page.evaluate((companyName) => {
+		document.querySelector('#qryCond').value = companyName;
+		document.querySelector('#qryBtn').click();
+	}, companyName)
 
 	await page.waitForNavigation({ waitUntil: 'networkidle0' })
 
@@ -30,8 +32,7 @@ async function handleScraperStart(req, res, next) {
 		encoding: "base64",
 		fullPage: true,
 	});
-	const image = new Buffer.from(image1Base64, "base64");
-
+	const image1 = new Buffer.from(image1Base64, "base64");
 
 	await page.evaluate(() => {
 		document.querySelector('#tabShareHolder').click()
@@ -62,23 +63,23 @@ async function handleScraperStart(req, res, next) {
 	});
 	const image4 = new Buffer.from(image4Base64, "base64");
 
-	// var zip = new JSZip();
-	// zip.file("image1.png", image1Base64, {base64: true});
-	// zip.file("image2.png", image2Base64, {base64: true});
-	// zip.file("image3.png", image3Base64, {base64: true});
-	// zip.file("image4.png", image4Base64, {base64: true});
-	// var content = zip.generate();
+	var zip = new JSZip();
+	zip.file("image1.png", image1, { binary: true, });
+	zip.file("image2.png", image2, { binary: true, });
+	zip.file("image3.png", image3, { binary: true, });
+	zip.file("image4.png", image4, { binary: true, });
+	await zip.generateAsync( { type : "nodebuffer", compression: 'DEFLATE' } )
+		.then((buffer) => {
+			var readStream = new stream.PassThrough();
+			readStream.end(buffer);
 
+			res.set('Content-disposition', 'attachment; filename=' + 'image.zip');
+			res.set('Content-Type', 'application/buffer');
 
-	var readStream = new stream.PassThrough();
-	readStream.end(image);
+			readStream.pipe(res);
+		})
 
 	await browser.close();
-	res.set('Content-disposition', 'attachment; filename=' + 'image.png');
-	// res.set('Content-Type', 'image/png');
-
-
-	readStream.pipe(res);
 };
 
 module.exports = handleScraperStart;
