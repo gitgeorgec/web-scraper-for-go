@@ -6,7 +6,7 @@ const scraperRoute = require('./routes/scraper');
 const PORT = process.env.PORT || 8081;
 
 
-app.use(cors())
+// app.use(cors())
 app.set("view engine", "pug")
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
