@@ -13,10 +13,7 @@ app.use(bodyParser.text());
 app.use("/api/scraper", scraperRoute)
 
 app.get('/', (req, res) => {
-	res.send(`<div>
-		<h1>TEST</h1>
-		<a href='/api/scraper'>click me</a>
-		</div>`)
+	res.send(`<div><h1>TEST</h1><a href='/api/scraper'>click me</a></div>`)
 })
 
 app.listen(PORT, () => {
