@@ -10,4 +10,9 @@ html(lang="en")
 			form(action="/api/scraper", method="post")
 				div 輸入公司名稱：
 					input(type="text", name="companyName")
+				div 自民國年/月／日：
+					input(type="date", name="startDate")
+				div 至民國年/月／日：
+					input(type="date", name="endDate")
+				
 				button(type="submit") 取得截圖

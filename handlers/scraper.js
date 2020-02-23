@@ -1,18 +1,23 @@
 const puppeteer = require("puppeteer");
 const stream = require('stream');
 const JSZip = require("jszip");
+// const firstPageAction = require('./firstpage');
 
 async function handleScraperStart(req, res, next) {
-	const { companyName } = req.body;
+	const { companyName, startDate, endDate } = req.body;
+
+	const startDateArry = startDate.split('-');
+	const endDateArry = endDate.split('-');
 	const zip = new JSZip();
 
 	try {
 		const browser = await puppeteer.launch({
-			headless: true,
+			headless: false,
 			defaultViewport: { width: 1440, height: 1080, },
 			args: ['--no-sandbox'],
 		}) ;
 		const page = await browser.newPage();
+
 		await page.goto("https://findbiz.nat.gov.tw/fts/query/QueryBar/queryInit.do", {
 			waitUtil: 'networkidle2'
 		});
@@ -83,11 +88,21 @@ async function handleScraperStart(req, res, next) {
 		}, companyName)
 
 		const showFrame = await page.frames()[3];
+
 		await showFrame.waitForNavigation({
 			waitUtil: 'networkidle2'
 		})
 
 		const totalPages = [...await showFrame.$$('option')].length;
+
+		const fidWebResultPagePng = await page.screenshot({
+			encoding: "base64",
+			format: 'A4',
+			fullPage: true,
+		});
+		const fidWebResultPagePngBinary = new Buffer.from(fidWebResultPagePng, "base64");
+
+		await zip.file(`fidWeb0.png`, fidWebResultPagePngBinary, { binary: true, });
 
 		let showList = [];
 
@@ -133,6 +148,55 @@ async function handleScraperStart(req, res, next) {
 		}
 
 		await fidWebResultPage.close();
+		
+		// 第三個
+		await page.goto('http://fyjud.lawbank.com.tw/index.aspx', {
+			waitUtil: 'networkidle2'
+		})
+
+		await page.evaluate((companyName, startDateArry, endDateArry) => {
+			document.querySelector('#courtFullAV').click()
+			document.querySelector('#courtFullAM').click()
+			document.querySelector('#kw').value = `被告${companyName}`
+			document.querySelector('#dy1').value = startDateArry[0] ? startDateArry[0] : null;
+			document.querySelector('#dm1').value = startDateArry[1] ? startDateArry[1] : null;
+			document.querySelector('#dd1').value = startDateArry[2] ? startDateArry[2] : null;
+			document.querySelector('#dy2').value = endDateArry[0] ? endDateArry[0] : null;
+			document.querySelector('#dm2').value = endDateArry[1] ? endDateArry[1] : null;
+			document.querySelector('#dd2').value = endDateArry[2] ? endDateArry[2] : null;
+			document.querySelector('input[type=submit]').click()
+		}, companyName, startDateArry, endDateArry);
+
+		await page.waitForNavigation({ waitUntil: 'networkidle0' })
+		
+		let menuFrame = await page.frames()[2];
+		let contentFrame = await page.frames()[3];
+
+		await menuFrame.waitForSelector('li')
+		await contentFrame.waitForSelector('#table3 tbody a')
+
+		const lawbankResultPagePdf = await page.screenshot({
+			encoding: "base64",
+			format: 'A4',
+			fullPage: true,
+		});
+		const lawbankResultPagePdfBinary = new Buffer.from(lawbankResultPagePdf, "base64");
+
+		await zip.file(`lawbank0.pdf`, lawbankResultPagePdfBinary, { binary: true, });
+
+		console.log('click')
+		contentFrame.click('#table3 tbody a')
+		contentFrame = await page.frames()[3];
+
+		// const contentPage = browser.newPage()
+		// const menuList = await menuFrame.evaluate(() => {
+		// 	return [...document.querySelectorAll('li a')].map(a => a.href)
+		// })
+
+
+		// ---end---
+
+
 		await zip.generateAsync( { type : "nodebuffer", compression: 'DEFLATE' } )
 			.then((buffer) => {
 				var readStream = new stream.PassThrough();
@@ -148,7 +212,7 @@ async function handleScraperStart(req, res, next) {
 			waitUtil: 'networkidle2'
 		})
 		await browser.close();
-		// res.redirect('/')
+		res.redirect('/')
 	} catch (error) {
 		console.log(error)
 		// res.send('some thing wrong!!')
