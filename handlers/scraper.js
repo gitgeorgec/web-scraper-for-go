@@ -12,12 +12,14 @@ async function handleScraperStart(req, res, next) {
 
 	try {
 		const browser = await puppeteer.launch({
-			headless: false,
+			headless: true,
 			defaultViewport: { width: 1440, height: 1080, },
 			args: ['--no-sandbox'],
 		}) ;
 		const page = await browser.newPage();
 
+		// first page
+		console.log('start scrap  https://findbiz.nat.gov.tw/fts/query/QueryBar/queryInit.do')
 		await page.goto("https://findbiz.nat.gov.tw/fts/query/QueryBar/queryInit.do", {
 			waitUtil: 'networkidle2'
 		});
@@ -75,6 +77,7 @@ async function handleScraperStart(req, res, next) {
 		zip.file("image3.pdf", image3, { binary: true, });
 		zip.file("image4.pdf", image4, { binary: true, });
 		// --------- 第二個
+		console.log('start scrap https://serv.gcis.nat.gov.tw/Fidbweb/index.jsp');
 
 		await page.goto("https://serv.gcis.nat.gov.tw/Fidbweb/index.jsp", {
 			waitUtil: 'networkidle2'
@@ -125,8 +128,6 @@ async function handleScraperStart(req, res, next) {
 			})
 		}
 
-		console.log(showList.length)
-
 		const fidWebResultPage = await browser.newPage()
 
 		for(let i =0; i < showList.length; i++) {
@@ -148,8 +149,9 @@ async function handleScraperStart(req, res, next) {
 		}
 
 		await fidWebResultPage.close();
-		
+
 		// 第三個
+		console.log('start scrap http://fyjud.lawbank.com.tw/index.aspx')
 		await page.goto('http://fyjud.lawbank.com.tw/index.aspx', {
 			waitUtil: 'networkidle2'
 		})
@@ -168,12 +170,12 @@ async function handleScraperStart(req, res, next) {
 		}, companyName, startDateArry, endDateArry);
 
 		await page.waitForNavigation({ waitUntil: 'networkidle0' })
-		
+
 		let menuFrame = await page.frames()[2];
-		let contentFrame = await page.frames()[3];
 
 		await menuFrame.waitForSelector('li')
-		await contentFrame.waitForSelector('#table3 tbody a')
+
+		const menuFrameList = await menuFrame.$$('li a');
 
 		const lawbankResultPagePdf = await page.screenshot({
 			encoding: "base64",
@@ -184,15 +186,53 @@ async function handleScraperStart(req, res, next) {
 
 		await zip.file(`lawbank0.pdf`, lawbankResultPagePdfBinary, { binary: true, });
 
-		console.log('click')
-		contentFrame.click('#table3 tbody a')
-		contentFrame = await page.frames()[3];
+		console.log('menuFrameList.length', menuFrameList.length)
 
-		// const contentPage = browser.newPage()
-		// const menuList = await menuFrame.evaluate(() => {
-		// 	return [...document.querySelectorAll('li a')].map(a => a.href)
-		// })
+		for (let i = 0; i < menuFrameList.length; i++) {
+			const menuFrame = page.frames()[2];
 
+			(await menuFrame.$(`li:nth-child(${i + 1}) a`)).click();
+
+			const numberOfSearchResult = await menuFrame.evaluate((i) => {
+				return parseInt(document.querySelector(`li:nth-child(${i + 1})`).textContent.split(" ").pop())
+			}, i)
+
+			const contentFrame = page.frames().find((frame) => frame.name() === 'contentFrame');
+
+			await contentFrame.waitForSelector('#table3 > tbody > tr:nth-child(2) > td:nth-child(2) > a');
+
+			(await contentFrame.$('#table3 > tbody > tr:nth-child(2) > td:nth-child(2) > a')).click();
+			await contentFrame.waitForSelector('#law-search > div.fint-pager > span:nth-child(2) > a:nth-child(3)')
+
+			for(let j = 0; j < numberOfSearchResult; j++) {
+				const nextButtonDisplay = await contentFrame.evaluate(() => {
+					const nextButton = document.querySelector('#law-search > div.fint-pager > span:nth-child(2) > a:nth-child(3)');
+
+					if (nextButton) {
+						return nextButton.style.display !== 'none'
+					} else {
+						return false
+					}
+				})
+
+				if (nextButtonDisplay) {
+					await contentFrame.waitForSelector('#law-search > div.fint-pager > span:nth-child(2) > a:nth-child(3)');
+					(await contentFrame.$('#law-search > div.fint-pager > span:nth-child(2) > a:nth-child(3)')).click();
+					await contentFrame.waitForNavigation({ waitUtil: 'networkidle2' })
+				}
+
+
+				const pdfFile = await page.pdf({
+					encoding: "base64",
+					format: 'A4',
+					fullPage: true,
+				});
+				const pdfFileBinary = new Buffer.from(pdfFile, "base64");
+
+				await zip.file(`fyjudWeb${i + 1}-${j}.pdf`, pdfFileBinary, { binary: true, });
+			}
+		}
+		//
 
 		// ---end---
 
@@ -212,12 +252,12 @@ async function handleScraperStart(req, res, next) {
 			waitUtil: 'networkidle2'
 		})
 		await browser.close();
-		res.redirect('/')
+		// res.redirect('/')
 	} catch (error) {
 		console.log(error)
-		// res.send('some thing wrong!!')
+		res.send(error)
 	}
 
-};
+}
 
 module.exports = handleScraperStart;
